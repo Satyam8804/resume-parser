@@ -129,9 +129,9 @@ const FileUploader = ({ setResume }) => {
 
     try {
       setUploading(true);
-
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/upload",
+        `${API_URL}/upload`,
         formData,
         {
           onUploadProgress: (event) => {
