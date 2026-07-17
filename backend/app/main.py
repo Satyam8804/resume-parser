@@ -1,12 +1,12 @@
-from fastapi import FastAPI,UploadFile,File
-from routes.upload import router as upload_router
+from fastapi import FastAPI, UploadFile, File
+from app.routes.upload import router as upload_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://your-frontend.vercel.app", "http://localhost:5173"],
+    allow_origins=["https://resume-parser-1-r41j.onrender.com", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -14,9 +14,7 @@ app.add_middleware(
 
 app.include_router(upload_router)
 
+
 @app.get("/")
 async def root():
-    return {"message":"FastAPI is running 🚀"}
-
-
-
+    return {"message": "FastAPI is running 🚀"}
