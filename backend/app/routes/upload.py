@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from groq import Groq
 import json
 from pydantic import ValidationError
-from schemas.user import User
+from app.schemas.user import User
 from dateutil import parser as date_parser
 from dateutil.relativedelta import relativedelta
 from datetime import datetime
