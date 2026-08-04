@@ -15,6 +15,8 @@ import {
   Send,
 } from "lucide-react";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
+import { toBackendPayload } from "../utils/transformResume";
+import axios from "axios";
 
 const SECTIONS = [
   { id: "personal", tag: "01", label: "Personal" },
@@ -135,7 +137,10 @@ const SectionCard = ({
 const ResumeForm = ({ resume, setResume }) => {
   const [active, setActive] = useState("personal");
   const refs = useRef({});
+  const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const handleChange = (section, field, value, index = null) => {
     setResume((prev) => {
       if (field === null) {
@@ -166,9 +171,25 @@ const ResumeForm = ({ resume, setResume }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(resume);
+    setSaveError(null);
+    setSaving(true);
+
+    try {
+      const payload = toBackendPayload(resume);
+      await axios.post(`${API_URL}/resumes/`, payload);
+      alert("Resume saved successfully!");
+    } catch (err) {
+      console.error(err);
+      setSaveError(
+        err.response?.data?.detail
+          ? JSON.stringify(err.response.data.detail)
+          : "Failed to save resume. Please check the fields and try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const scrollTo = (id) => {
@@ -434,6 +455,7 @@ const ResumeForm = ({ resume, setResume }) => {
                   label="Years of Experience"
                   type="number"
                   min="0"
+                  step="0.1"
                   placeholder="2"
                   value={exp.years_of_experience}
                   onChange={(e) =>
@@ -655,11 +677,13 @@ const ResumeForm = ({ resume, setResume }) => {
 
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 py-3.5 text-sm font-semibold text-white transition hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-700/20 active:bg-red-800"
+          disabled={saving}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 py-3.5 text-sm font-semibold text-white transition hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-700/20 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
         >
           <Send className="h-4 w-4 shrink-0" />
-          Save Resume
+          {saving ? "Saving..." : "Save Resume"}
         </button>
+        {saveError && <p className="text-sm text-red-700 mt-2">{saveError}</p>}
       </form>
     </div>
   );

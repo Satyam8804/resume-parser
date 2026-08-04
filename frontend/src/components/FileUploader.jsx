@@ -6,7 +6,6 @@ const ACCEPTED_TYPES = ["application/pdf"];
 const ACCEPTED_EXTENSIONS = [".pdf"];
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-// Returns an error message string if the file is invalid, or null if it's fine.
 const validateFile = (file) => {
   if (!file) return "No file selected.";
 
@@ -14,9 +13,6 @@ const validateFile = (file) => {
   const typeOk = ACCEPTED_TYPES.includes(file.type);
   const extensionOk = ACCEPTED_EXTENSIONS.includes(extension);
 
-  // Some OS/browser combos report an empty or generic mime type for PDFs
-  // (e.g. drag-drop from certain file managers), so fall back to the
-  // extension check rather than rejecting purely on `file.type`.
   if (!typeOk && !extensionOk) {
     return "Only PDF files are supported.";
   }
@@ -56,7 +52,12 @@ const normalizeResume = (data) => {
     summary: data.summary || "",
     education: data.education || [],
     experience: data.experiences || data.experience || [],
-    projects: data.projects || [],
+    projects: (data.projects || []).map((p) => ({
+      ...p,
+      technologies: Array.isArray(p.technologies)
+        ? p.technologies.join(", ")
+        : p.technologies || "",
+    })),
     skills: (data.skills || []).map(skillToString).filter(Boolean),
     certifications: data.certifications || [],
   };
@@ -130,16 +131,12 @@ const FileUploader = ({ setResume }) => {
     try {
       setUploading(true);
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-      const response = await axios.post(
-        `${API_URL}/upload`,
-        formData,
-        {
-          onUploadProgress: (event) => {
-            const percent = Math.round((event.loaded * 100) / event.total);
-            setProgress(percent);
-          },
-        }
-      );
+      const response = await axios.post(`${API_URL}/upload`, formData, {
+        onUploadProgress: (event) => {
+          const percent = Math.round((event.loaded * 100) / event.total);
+          setProgress(percent);
+        },
+      });
 
       alert("Upload Successful");
       setResume(normalizeResume(response.data.data));
