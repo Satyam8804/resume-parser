@@ -11,7 +11,7 @@ const RankingsTable = ({ jobId }) => {
   const fetchRankings = async () => {
     setLoadingRankings(true);
     try {
-      const res = await axios.get(`${API_URL}/jobs/${jobId}/rankings`);
+      const res = await axios.get(`${API_URL}/api/jobs/${jobId}/rankings`);
       setRankings(res.data);
     } catch (err) {
       console.error(err);
@@ -22,7 +22,7 @@ const RankingsTable = ({ jobId }) => {
 
   const fetchStatus = async () => {
     try {
-      const res = await axios.get(`${API_URL}/jobs/${jobId}/score-status`);
+      const res = await axios.get(`${API_URL}/api/jobs/${jobId}/score-status`);
       setStatus(res.data);
       return res.data.status;
     } catch (err) {
@@ -60,14 +60,16 @@ const RankingsTable = ({ jobId }) => {
   if (!jobId) return null;
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-zinc-900">Rankings</h2>
 
       {status && status.status !== "completed" && (
         <div className="mb-4">
           <div className="mb-1.5 flex justify-between font-mono text-[11px] text-zinc-500">
             <span>SCORING</span>
-            <span>{status.scored_count}/{status.total_resumes}</span>
+            <span>
+              {status.scored_count}/{status.total_resumes}
+            </span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200">
             <div
@@ -82,37 +84,77 @@ const RankingsTable = ({ jobId }) => {
         </div>
       )}
 
-      {loadingRankings && <p className="text-sm text-zinc-500">Loading rankings...</p>}
-
-      {!loadingRankings && rankings.length === 0 && status?.status === "completed" && (
-        <p className="text-sm text-zinc-500">No resumes scored yet.</p>
+      {loadingRankings && (
+        <p className="text-sm text-zinc-500">Loading rankings...</p>
       )}
 
+      {!loadingRankings &&
+        rankings.length === 0 &&
+        status?.status === "completed" && (
+          <p className="text-sm text-zinc-500">No resumes scored yet.</p>
+        )}
+
       {rankings.length > 0 && (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 text-xs uppercase tracking-widest text-zinc-500">
-              <th className="py-2 pr-4">Rank</th>
-              <th className="py-2 pr-4">Candidate</th>
-              <th className="py-2 pr-4">Score</th>
-              <th className="py-2">Reasoning</th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          {/* Mobile — stacked cards, hidden on md+ */}
+          <div className="space-y-3 md:hidden">
             {rankings.map((r, i) => (
-              <tr key={r._id} className="border-b border-zinc-100">
-                <td className="py-2.5 pr-4 font-mono text-zinc-400">{i + 1}</td>
-                <td className="py-2.5 pr-4 font-medium text-zinc-900">{r.candidate_name}</td>
-                <td className="py-2.5 pr-4">
-                  <span className="rounded-full bg-red-50 px-2.5 py-1 font-mono text-xs text-red-700">
+              <div
+                key={r._id}
+                className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-zinc-400">
+                      #{String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="font-medium text-zinc-900">
+                      {r.candidate_name}
+                    </span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 font-mono text-xs font-semibold text-red-700">
                     {r.score}
                   </span>
-                </td>
-                <td className="py-2.5 text-zinc-600">{r.reasoning}</td>
-              </tr>
+                </div>
+                <p className="text-sm leading-relaxed text-zinc-600">
+                  {r.reasoning}
+                </p>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          {/* Desktop — table, hidden below md */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 text-xs uppercase tracking-widest text-zinc-500">
+                  <th className="py-2 pr-4">Rank</th>
+                  <th className="py-2 pr-4">Candidate</th>
+                  <th className="py-2 pr-4">Score</th>
+                  <th className="py-2">Reasoning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankings.map((r, i) => (
+                  <tr key={r._id} className="border-b border-zinc-100">
+                    <td className="py-2.5 pr-4 font-mono text-zinc-400">
+                      {i + 1}
+                    </td>
+                    <td className="py-2.5 pr-4 font-medium text-zinc-900">
+                      {r.candidate_name}
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <span className="rounded-full bg-red-50 px-2.5 py-1 font-mono text-xs text-red-700">
+                        {r.score}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-zinc-600">{r.reasoning}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
