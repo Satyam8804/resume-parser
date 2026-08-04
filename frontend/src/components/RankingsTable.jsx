@@ -11,7 +11,7 @@ const RankingsTable = ({ jobId }) => {
   const fetchRankings = async () => {
     setLoadingRankings(true);
     try {
-      const res = await axios.get(`${API_URL}/api/jobs/${jobId}/rankings`);
+      const res = await axios.get(`${API_URL}/jobs/${jobId}/rankings`);
       setRankings(res.data);
     } catch (err) {
       console.error(err);
@@ -22,7 +22,7 @@ const RankingsTable = ({ jobId }) => {
 
   const fetchStatus = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/jobs/${jobId}/score-status`);
+      const res = await axios.get(`${API_URL}/jobs/${jobId}/score-status`);
       setStatus(res.data);
       return res.data.status;
     } catch (err) {
