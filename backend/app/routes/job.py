@@ -63,20 +63,6 @@ async def run_scoring(job_id: str, job_description: str):
         {"_id": ObjectId(job_id)},
         {"$set": {"status": "completed"}},
     )
-
-        await db["jobs"].update_one(
-            {"_id": ObjectId(job_id)},
-            {"$set": {"scored_count": i + 1}},
-        )
-
-        if i < total - 1:
-            await asyncio.sleep(2)
-
-    await db["jobs"].update_one(
-        {"_id": ObjectId(job_id)},
-        {"$set": {"status": "completed"}},
-    )
-
 @router.get("/{job_id}")
 async def get_job(job_id: str):
     job = await db["jobs"].find_one({"_id": ObjectId(job_id)})
