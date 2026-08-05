@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
 from pathlib import Path
 from pypdf import PdfReader
+from docx import Document
 import os
 from dotenv import load_dotenv
 from groq import Groq
@@ -19,6 +20,8 @@ router = APIRouter()
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+
 groq_api_key = os.getenv("GROQ_API_KEY")
 
 if not groq_api_key:
@@ -31,14 +34,41 @@ model = "llama-3.3-70b-versatile"
 role = "user"
 
 
-def extract_text(file_path: str):
+def extract_text_from_pdf(file_path: Path) -> str:
     reader = PdfReader(file_path)
     text = ""
-
     for page in reader.pages:
-        text += page.extract_text()
-
+        text += page.extract_text() or ""
     return text
+
+
+def extract_text_from_docx(file_path: Path) -> str:
+    document = Document(file_path)
+    parts = []
+
+    for para in document.paragraphs:
+        if para.text.strip():
+            parts.append(para.text)
+
+    # also pull text out of tables, since resumes sometimes use them for layout
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text.strip():
+                    parts.append(cell.text)
+
+    return "\n".join(parts)
+
+
+def extract_text(file_path: Path) -> str:
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".pdf":
+        return extract_text_from_pdf(file_path)
+    elif suffix == ".docx":
+        return extract_text_from_docx(file_path)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
 
 
 CURRENT_JOB_MARKERS = {"present", "current", "currently working", "ongoing", "till date", "now", ""}
@@ -74,6 +104,14 @@ def compute_years(start_date: str, end_date: str) -> float | None:
 
 @router.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
+    file_suffix = Path(file.filename).suffix.lower()
+
+    if file_suffix not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{file_suffix}'. Only PDF and DOCX are supported.",
+        )
+
     file_path = UPLOAD_DIR / file.filename
 
     with open(file_path, "wb") as buffer:
@@ -82,7 +120,7 @@ async def upload_file(file: UploadFile = File(...)):
     text = extract_text(file_path)
 
     if not text or not text.strip():
-        raise HTTPException(status_code=422, detail="Could not extract any text from the uploaded PDF.")
+        raise HTTPException(status_code=422, detail="Could not extract any text from the uploaded file.")
 
     schema = User.model_json_schema()
 

@@ -2,8 +2,11 @@ import { useRef, useState } from "react";
 import axios from "axios";
 import { UploadCloud, FileText, X, Loader2, AlertCircle } from "lucide-react";
 
-const ACCEPTED_TYPES = ["application/pdf"];
-const ACCEPTED_EXTENSIONS = [".pdf"];
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+];
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx"];
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const validateFile = (file) => {
@@ -14,7 +17,7 @@ const validateFile = (file) => {
   const extensionOk = ACCEPTED_EXTENSIONS.includes(extension);
 
   if (!typeOk && !extensionOk) {
-    return "Only PDF files are supported.";
+    return "Only PDF or DOCX files are supported.";
   }
 
   if (file.size === 0) {
@@ -164,7 +167,7 @@ const FileUploader = ({ setResume }) => {
               Upload resume
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              PDF only — we'll fill the form in automatically.
+              PDF or DOCX — we'll fill the form in automatically.
             </p>
           </div>
 
@@ -206,7 +209,7 @@ const FileUploader = ({ setResume }) => {
                 </button>
 
                 <p className="mt-4 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
-                  PDF · up to 10MB
+                  PDF or DOCX · up to 10MB
                 </p>
               </>
             ) : (
@@ -241,7 +244,7 @@ const FileUploader = ({ setResume }) => {
           <input
             ref={fileRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
             hidden
             onChange={handleFileChange}
           />

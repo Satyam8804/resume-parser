@@ -40,13 +40,29 @@ async def run_scoring(job_id: str, job_description: str):
             {"$set": {
                 "job_id": job_id,
                 "resume_id": str(resume["_id"]),
-                "candidate_name": resume.get("name", "Unknown"),
+                "candidate_name": result["candidate_name"],
+                "matching_skills": result["matching_skills"],
+                "missing_skills": result["missing_skills"],
+                "experience_requirement_met": result["experience_requirement_met"],
                 "score": result["score"],
-                "reasoning": result["reasoning"],
+                "verdict": result["verdict"],
                 "scored_at": datetime.utcnow(),
             }},
             upsert=True,
         )
+
+        await db["jobs"].update_one(
+            {"_id": ObjectId(job_id)},
+            {"$set": {"scored_count": i + 1}},
+        )
+
+        if i < total - 1:
+            await asyncio.sleep(2)
+
+    await db["jobs"].update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": {"status": "completed"}},
+    )
 
         await db["jobs"].update_one(
             {"_id": ObjectId(job_id)},
