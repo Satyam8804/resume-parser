@@ -32,7 +32,7 @@ if not groq_api_key:
 # Explicit timeout so a slow/unreachable Groq call fails fast instead of hanging.
 client = Groq(api_key=groq_api_key, timeout=45.0, max_retries=1)
 
-model = "llama-3.3-70b-versatile"
+model = "openai/gpt-oss-120b"
 
 
 def extract_text_from_pdf(data: bytes) -> str:
