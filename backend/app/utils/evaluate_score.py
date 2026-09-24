@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-model = "llama-3.3-70b-versatile"
+model = "openai/gpt-oss-120b"
+
 
 
 def build_resume_summary(resume: dict) -> str:
