@@ -1,49 +1,48 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import shutil
-from pathlib import Path
-from pypdf import PdfReader
-from docx import Document
-import os
-from dotenv import load_dotenv
-from groq import Groq
 import json
-from pydantic import ValidationError
-from app.schemas.user import User
+import logging
+import os
+from datetime import datetime
+from io import BytesIO
+from pathlib import Path
+
 from dateutil import parser as date_parser
 from dateutil.relativedelta import relativedelta
-from datetime import datetime
+from docx import Document
+from dotenv import load_dotenv
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from groq import Groq
+from pydantic import ValidationError
+from pypdf import PdfReader
+
+from app.schemas.user import User
 
 load_dotenv()
 
-router = APIRouter()
+logger = logging.getLogger("uvicorn.error")
 
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 
 if not groq_api_key:
-    raise ValueError("API key not found!")
+    raise ValueError("GROQ_API_KEY is not set")
 
-client = Groq(api_key=groq_api_key)
+# Explicit timeout so a slow/unreachable Groq call fails fast instead of hanging.
+client = Groq(api_key=groq_api_key, timeout=45.0, max_retries=1)
 
 model = "llama-3.3-70b-versatile"
 
-role = "user"
+
+def extract_text_from_pdf(data: bytes) -> str:
+    reader = PdfReader(BytesIO(data))
+    # Join pages with a newline so words at page boundaries don't get glued together.
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-def extract_text_from_pdf(file_path: Path) -> str:
-    reader = PdfReader(file_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-    return text
-
-
-def extract_text_from_docx(file_path: Path) -> str:
-    document = Document(file_path)
+def extract_text_from_docx(data: bytes) -> str:
+    document = Document(BytesIO(data))
     parts = []
 
     for para in document.paragraphs:
@@ -60,13 +59,11 @@ def extract_text_from_docx(file_path: Path) -> str:
     return "\n".join(parts)
 
 
-def extract_text(file_path: Path) -> str:
-    suffix = file_path.suffix.lower()
-
+def extract_text(data: bytes, suffix: str) -> str:
     if suffix == ".pdf":
-        return extract_text_from_pdf(file_path)
+        return extract_text_from_pdf(data)
     elif suffix == ".docx":
-        return extract_text_from_docx(file_path)
+        return extract_text_from_docx(data)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
 
@@ -102,9 +99,11 @@ def compute_years(start_date: str, end_date: str) -> float | None:
     return round(total_months / 12, 1)
 
 
+# Plain `def` (not `async def`): FastAPI runs it in a threadpool, so the blocking
+# PDF parsing and the synchronous Groq call don't freeze the event loop.
 @router.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    file_suffix = Path(file.filename).suffix.lower()
+def upload_file(file: UploadFile = File(...)):
+    file_suffix = Path(file.filename or "").suffix.lower()
 
     if file_suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -112,12 +111,15 @@ async def upload_file(file: UploadFile = File(...)):
             detail=f"Unsupported file type '{file_suffix}'. Only PDF and DOCX are supported.",
         )
 
-    file_path = UPLOAD_DIR / file.filename
+    data = file.file.read()
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    text = extract_text(file_path)
+    try:
+        text = extract_text(data, file_suffix)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Text extraction failed for %s", file.filename)
+        raise HTTPException(status_code=422, detail="Could not read this file. It may be corrupted or password-protected.")
 
     if not text or not text.strip():
         raise HTTPException(status_code=422, detail="Could not extract any text from the uploaded file.")
@@ -156,10 +158,12 @@ async def upload_file(file: UploadFile = File(...)):
 
     prompts = f'''This is a candidate resume. please extract all information and from this {text}'''
 
-    message = {"role": role, "content": prompts}
+    message = {"role": "user", "content": prompts}
 
     messages = [message_system, message]
 
+    # NOTE: LLM failures return 500, not 502. A 502 in the browser should only ever
+    # mean Render's proxy couldn't reach the app, never "my own code said so".
     try:
         response = client.chat.completions.create(
             model=model,
@@ -167,14 +171,16 @@ async def upload_file(file: UploadFile = File(...)):
             response_format=response_format,
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM request failed: {e}")
+        logger.exception("Groq request failed")
+        raise HTTPException(status_code=500, detail=f"LLM request failed: {e}")
 
     answer = response.choices[0].message.content
 
     try:
         data_file = json.loads(answer)
     except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=502, detail="LLM returned malformed JSON. Please retry.")
+        logger.error("LLM returned malformed JSON: %.500s", answer)
+        raise HTTPException(status_code=500, detail="LLM returned malformed JSON. Please retry.")
 
     try:
         user = User(**data_file)

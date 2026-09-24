@@ -10,14 +10,14 @@ from app.schemas.skill import Skill
 class User(BaseModel):
     name: str
     email: str
-    summary: str
+    summary: str | None = None
     phone: str | None = None
     linkedin: str | None = None
     github: str | None = None
     portfolio: str | None = None
     total_experience: float | None = None
-    experiences: list[Experience]
-    education: list[Education]
-    projects: list[Project]
-    certifications: list[Certification]
-    skills: list[Skill]
+    experiences: list[Experience] = []
+    education: list[Education] = []
+    projects: list[Project] = []
+    certifications: list[Certification] = []
+    skills: list[Skill] = []
